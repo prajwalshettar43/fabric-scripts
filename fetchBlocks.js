@@ -25,23 +25,25 @@ async function main() {
         await gateway.connect(ccp, { wallet, identity: 'Admin', discovery: { enabled: true, asLocalhost: true } });
 
         // Get the network channel
-        const network = await gateway.getNetwork('mychannel'); // Change to your actual channel name
+        const network = await gateway.getNetwork('evidencechannel'); // Updated channel name
         const contract = network.getContract('qscc'); // Query System Chaincode
 
         // Get the latest block number
-        const result = await contract.evaluateTransaction('GetChainInfo', 'mychannel');
-        
-        // Decode protobuf response
-        const chainInfo = protos.common.BlockchainInfo.decode(result);
-        const blockHeight = parseInt(chainInfo.height);
+        const result = await contract.evaluateTransaction('GetChainInfo', 'evidencechannel');
+        const chainInfo = protos.common.BlockchainInfo.decode(Buffer.from(result)); // Convert to Buffer
+        const blockHeight = parseInt(chainInfo.height, 10);
 
         console.log(`Blockchain height: ${blockHeight}`);
 
         // Iterate over all blocks
         for (let i = 0; i < blockHeight; i++) {
-            const blockData = await contract.evaluateTransaction('GetBlockByNumber', 'mychannel', i.toString());
-            const block = protos.common.Block.decode(blockData);
-            console.log(`Block ${i}:`, JSON.stringify(block, null, 2));
+            try {
+                const blockData = await contract.evaluateTransaction('GetBlockByNumber', 'evidencechannel', i.toString());
+                const block = protos.common.Block.decode(Buffer.from(blockData)); // Convert to Buffer
+                console.log(`Block ${i}:`, JSON.stringify(block, null, 2));
+            } catch (err) {
+                console.error(`Error fetching block ${i}: ${err.message}`);
+            }
         }
 
         // Disconnect from Fabric
