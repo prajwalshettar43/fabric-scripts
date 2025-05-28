@@ -1,0 +1,22 @@
+mkdir -p ~/hyperledger && cd ~/hyperledger
+curl -sSL https://bit.ly/2ysbOFE | bash -s
+
+cd fabric-samples/test-network
+
+./network.sh up createChannel -ca -c evidencechannel
+
+echo $CORE_PEER_TLS_ENABLED
+
+export CORE_PEER_TLS_ENABLED=true
+export CORE_PEER_LOCALMSPID="Org1MSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=/home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=/home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+export CORE_PEER_ADDRESS=localhost:7051
+
+peer channel getinfo -c evidencechannel
+
+./network.sh down
+
+
+
+/home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
