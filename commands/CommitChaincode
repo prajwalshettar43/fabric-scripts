@@ -1,0 +1,111 @@
+#These commands are used to commit chaincode and add a block to the chain
+
+
+#convert the chaincode into package(Make sure to check directory and filename)
+cd ~/fabric-samples/chaincode/evidence_tracker
+
+#for new go code
+go mod init evidence
+go mod tidy
+go build -o evidence
+
+#for reupload
+go clean
+go mod tidy
+go build -o evidence_tracker
+
+
+peer lifecycle chaincode package evidence.tar.gz --path . --lang golang --label basic_1
+
+
+#install the chaincode on both organizations
+
+#to check if chaincode is installed on a peer
+peer lifecycle chaincode queryinstalled
+
+
+#for Org1
+peer lifecycle chaincode install evidence_chaincode.tar.gz
+
+#change to Org2 (check the file location)
+export CORE_PEER_LOCALMSPID="Org2MSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=/home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=$HOME/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/users/Admin@org2.example.com/msp
+export CORE_PEER_ADDRESS=localhost:9051
+
+#install for org2
+peer lifecycle chaincode install evidence_chaincode.tar.gz
+
+#set this address if empty check by running "echo $ORDERER_CA"
+export ORDERER_CA=/home/slayer/fabric-samples/test-network/organizations/ordererOrganizations/example.com/orderers/orderer.example.com/tls/ca.crt
+export PEER0_ORG1_CA=/home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+
+#To approve the chaincode run this for both organizations You can also add package id manually(its better)
+peer lifecycle chaincode approveformyorg -o localhost:7050 \
+--ordererTLSHostnameOverride orderer.example.com \
+--tls --cafile $ORDERER_CA \
+-C evidencechannel --name evidence_1 \
+--version 1.0 \
+--package-id evidence_1:1fa6da7d755277e3279a5e9c404e22e8ef3b25193fca03d911f4e3f924f158db \
+--sequence 1
+
+
+#just in case if you want to switch to org1
+export CORE_PEER_LOCALMSPID="Org1MSP"
+export CORE_PEER_TLS_ROOTCERT_FILE=/home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt
+export CORE_PEER_MSPCONFIGPATH=/home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/users/Admin@org1.example.com/msp
+export CORE_PEER_ADDRESS=localhost:7051
+
+#to verify if both organizations have approved (Verify name of channel and name of tar.gz)
+peer lifecycle chaincode checkcommitreadiness -o localhost:7050 \
+--ordererTLSHostnameOverride orderer.example.com \
+--tls --cafile $ORDERER_CA \
+-C evidencechannel \
+--name evidence_1 \
+--version 1.0 \
+--sequence 1 \
+--output json
+
+#to commit the chaincode
+peer lifecycle chaincode commit -o localhost:7050 \
+--ordererTLSHostnameOverride orderer.example.com \
+--tls --cafile $ORDERER_CA \
+--channelID evidencechannel \
+--name evidence_1 \
+--peerAddresses localhost:7051 --tlsRootCertFiles /home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt \
+--peerAddresses localhost:9051 --tlsRootCertFiles /home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt \
+--version 1.0 --sequence 1
+
+#to verify the committed chaincode
+peer lifecycle chaincode querycommitted -C evidencechannel --name evidence_1
+
+
+
+#Add a line to a file
+sudo nano /etc/hosts
+127.0.0.1 peer0.org1.example.com
+127.0.0.1 peer0.org2.example.com
+
+#to add evidence
+peer chaincode invoke -o orderer.example.com:7050 \
+    --tls true --cafile $ORDERER_CA \
+    -C evidencechannel -n evidence_tracker \
+    --peerAddresses localhost:7051 \
+    --tlsRootCertFiles $PEER0_ORG1_CA \
+    -c '{"Args":["AddEvidence", "evidence_hash_123"]}'
+
+# to query evidence (Give the valid index)
+ peer chaincode query -C evidencechannel -n qscc -c '{"Args":["GetBlockByNumber","evidencechannel","1"]}'
+
+# to invoke the chaincode necessary to add blocks from code
+peer chaincode invoke -o orderer.example.com:7050 \
+    --tls --cafile $ORDERER_CA \
+    -C evidencechannel -n evidence_tracker \
+    --peerAddresses peer0.org1.example.com:7051 \
+    --tlsRootCertFiles /home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org1.example.com/peers/peer0.org1.example.com/tls/ca.crt \
+    --peerAddresses peer0.org2.example.com:7051 \
+    --tlsRootCertFiles /home/slayer/fabric-samples/test-network/organizations/peerOrganizations/org2.example.com/peers/peer0.org2.example.com/tls/ca.crt \
+    -c '{"Args":["InitLedger"]}'
+
+
+peer chaincode query -C evidencechannel -n qscc -c '{"Args":["GetTransactionByID","evidencechannel","e4da03490cd183a74cc296adf08f035ebe0e1b5c5b32dc61a9c4f5a9b212358c"]}'
